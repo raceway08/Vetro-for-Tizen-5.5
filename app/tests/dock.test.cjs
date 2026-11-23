@@ -3,7 +3,7 @@ const assert = require('assert').strict;
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const {Dock} = require('../service/dock.js');
+const {Dock, dotnetHost} = require('../service/dock.js');
 
 const hex = s => Buffer.from(s).toString('hex');
 const HOME_DATA = [
@@ -65,7 +65,11 @@ function fixture(options) {
     assert.ok(fs.existsSync(f.dock.allAppsFile), 'the All apps list is saved next to it');
     assert.ok(/tvlauncher-dotnet\.dll --apps '[^']+apps\.tsv' --inputs '[^']+inputs\.tsv'( --all-apps '[^']+allapps\.tsv')? --hidden --claim-home( --service-port \d+)? --home-code 63 --kill-on-home com\.samsung\.tv\.csfs,com\.samsung\.tv\.home\.sidebar,com\.samsung\.tv\.home\.media/.test(f.tv.started),
         'the verified dock command line: ' + f.tv.started);
-    assert.ok(f.tv.started.includes('TVLAUNCHER_DIR=/home/owner') && f.tv.started.includes('WAYLAND_DISPLAY=wayland-0') && f.tv.started.includes('setsid nohup /usr/bin/dotnet'));
+    const selectedHost = dotnetHost();
+    assert.ok(f.tv.started.includes('TVLAUNCHER_DIR=/home/owner') && f.tv.started.includes('WAYLAND_DISPLAY=wayland-0') && f.tv.started.includes('setsid nohup ' + selectedHost));
+    assert.equal(dotnetHost(p => p === '/usr/bin/dotnet'), '/usr/bin/dotnet', 'use the normal muxer when present');
+    assert.equal(dotnetHost(p => p === '/usr/bin/dotnet-launcher'), '/usr/bin/dotnet-launcher --standalone', 'Tizen 5.5 uses the signed standalone host');
+    assert.equal(dotnetHost(() => false), '/usr/bin/dotnet', 'retain the normal fallback on unrecognized layouts');
     assert.ok(f.tv.started.indexOf('kill -9') < f.tv.started.indexOf('setsid'), 'a previous dock is stopped before the new one starts');
     assert.ok(/tr "\\0" " " < \/proc\/\$p\/cmdline/.test(f.tv.started) && f.tv.started.includes('grep -q tvlauncher-dotnet.dll'), 'only a pid that is our dll is killed');
     assert.ok(/systemd-run --unit=vetro-dock --collect -p WorkingDirectory=.*-p KillSignal=SIGKILL .*\/usr\/bin\/env HOME=\/home\/owner .*\/usr\/bin\/dotnet tvlauncher-dotnet\.dll/.test(f.tv.started),
@@ -74,7 +78,7 @@ function fixture(options) {
         f.tv.started.indexOf('systemctl stop --no-block vetro-dock.service') < f.tv.started.indexOf('systemd-run'), 'a previous unit is stopped non-blockingly first');
     assert.ok(f.tv.started.includes('systemctl is-active vetro-dock.service 2>/dev/null') && f.tv.started.includes('active|activating|deactivating|reloading') && f.tv.started.includes('systemctl reset-failed vetro-dock.service'),
         'unit stop polls is-active states including deactivating and resets failed unit state');
-    assert.ok(/systemd-run [^\n]*\|\| \{ [^\n]*setsid nohup \/usr\/bin\/dotnet [^\n]*<\/dev\/null >\/dev\/null 2>&1 & \}/.test(f.tv.started), 'the detached start remains as a braced fallback');
+    assert.ok(f.tv.started.includes('|| { ') && f.tv.started.includes('setsid nohup ' + selectedHost) && f.tv.started.includes('</dev/null >/dev/null 2>&1 & }'), 'the detached start remains as a braced fallback');
     assert.equal(f.tv.csfs, false, 'Samsung Home closed once the dock is up');
     assert.equal(JSON.parse(fs.readFileSync(path.join(f.tmp, 'state.json'), 'utf8')).enabled, true);
     assert.equal(f.tv.scripts[f.tv.scripts.length - 1].startsWith('echo '), true);

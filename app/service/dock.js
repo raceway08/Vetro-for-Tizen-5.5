@@ -72,12 +72,13 @@ var APP_GONE_ROUNDS = 2;                               // and given up on when t
 function wrap(s) { return 'echo ' + Buffer.from(s).toString('base64') + ' | base64 -d | sh'; }
 function q(s) { return "'" + String(s).replace(QUOTE_RE, "'\\''") + "'"; }
 
-function dotnetHost() {
+function dotnetHost(fileExists) {
+    var exists = fileExists || fs.existsSync;
     // Tizen 5.5 TV firmware may not ship the dotnet muxer. Its signed launcher
     // can run a netcoreapp3.0 assembly with --standalone. The dock itself does
     // not use the capability-based archive bootstrap.
-    if (fs.existsSync('/usr/bin/dotnet')) return '/usr/bin/dotnet';
-    if (fs.existsSync('/usr/bin/dotnet-launcher')) return '/usr/bin/dotnet-launcher --standalone';
+    if (exists('/usr/bin/dotnet')) return '/usr/bin/dotnet';
+    if (exists('/usr/bin/dotnet-launcher')) return '/usr/bin/dotnet-launcher --standalone';
     // Keep the historical path as the final fallback for unusual package layouts.
     return '/usr/bin/dotnet';
 }
@@ -1351,4 +1352,4 @@ Dock.prototype.checkCustomApp = function (appId) {
 };
 
 module.exports = {HOME_PICTURE_SCRIPT: HOME_PICTURE_SCRIPT, parseAudio: parseAudio, rowAfter: rowAfter, cleanRow: cleanRow, Dock: Dock, runningCheck: runningCheck, parseCheck: parseCheck, STATE_FILE: STATE_FILE, APPS_FILE: APPS_FILE, CUSTOM_APPS_FILE: CUSTOM_APPS_FILE,
-    customCandidate: customCandidate, customAppCheck: customAppCheck, hexLabel: hexLabel, LOG_FILE: LOG_FILE, shardCardText: shardCardText, cleanCards: cleanCards};
+    customCandidate: customCandidate, customAppCheck: customAppCheck, hexLabel: hexLabel, LOG_FILE: LOG_FILE, shardCardText: shardCardText, cleanCards: cleanCards, dotnetHost: dotnetHost};
