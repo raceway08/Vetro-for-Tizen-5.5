@@ -90,11 +90,11 @@ function shellQuote(value) {
 function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
     var staging = STAGE + '/' + pkg;
     if (!useNodeFifo) {
-        return '#!/bin/sh\\n' +
+        return '#!/bin/sh\n' +
             hostCommand + ' ' + staging + '/SamsungTvRootAgent.dll ' +
             '127.0.0.1 ' + agentPort + ' ' +
             staging + '/root-agent.token ' +
-            staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\\n';
+            staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\n';
     }
 
     var nodeAgent = fs.readFileSync(path.join(__dirname, 'root-agent-node.js'));
@@ -102,19 +102,19 @@ function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
     var nodeB64 = new Buffer(nodeAgent).toString('base64');
     var workerB64 = new Buffer(worker).toString('base64');
 
-    return '#!/bin/sh\\n' +
-        'umask 077\\n' +
-        'PATH=/usr/bin:/bin\\nexport PATH\\n' +
-        'STAGING=' + shellQuote(staging) + '\\n' +
-        'WORKDIR="$STAGING/agent-runtime-$"\\n' +
-        '/bin/mkdir -m 700 "$WORKDIR" || exit 1\\n' +
-        "printf '%s' " + shellQuote(nodeB64) + ' | /usr/bin/base64 -d > "$WORKDIR/agent.js" || exit 1\\n' +
-        "printf '%s' " + shellQuote(workerB64) + ' | /usr/bin/base64 -d > "$WORKDIR/worker.sh" || exit 1\\n' +
-        '/usr/bin/mkfifo "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" || exit 1\\n' +
-        '/bin/chmod 600 "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" "$WORKDIR/agent.js" "$WORKDIR/worker.sh" || exit 1\\n' +
-        'WORKER_SOURCE=$(/bin/cat "$WORKDIR/worker.sh") || exit 1\\n' +
-        '/usr/bin/setsid /bin/sh -c "$WORKER_SOURCE" vetro-worker "$WORKDIR" </dev/null >/dev/null 2>&1 &\\n' +
-        '/usr/bin/setsid /usr/bin/node "$WORKDIR/agent.js" "$STAGING/root-agent.token" ' + agentPort + ' "$STAGING/root-agent.status" "$STAGING/root-agent.log" "$WORKDIR" </dev/null >/dev/null 2>&1 &\\n';
+    return '#!/bin/sh\n' +
+        'umask 077\n' +
+        'PATH=/usr/bin:/bin\nexport PATH\n' +
+        'STAGING=' + shellQuote(staging) + '\n' +
+        'WORKDIR="$STAGING/agent-runtime-$"\n' +
+        '/bin/mkdir -m 700 "$WORKDIR" || exit 1\n' +
+        "printf '%s' " + shellQuote(nodeB64) + ' | /usr/bin/base64 -d > "$WORKDIR/agent.js" || exit 1\n' +
+        "printf '%s' " + shellQuote(workerB64) + ' | /usr/bin/base64 -d > "$WORKDIR/worker.sh" || exit 1\n' +
+        '/usr/bin/mkfifo "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" || exit 1\n' +
+        '/bin/chmod 600 "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" "$WORKDIR/agent.js" "$WORKDIR/worker.sh" || exit 1\n' +
+        'WORKER_SOURCE=$(/bin/cat "$WORKDIR/worker.sh") || exit 1\n' +
+        '/usr/bin/setsid /bin/sh -c "$WORKER_SOURCE" vetro-worker "$WORKDIR" </dev/null >/dev/null 2>&1 &\n' +
+        '/usr/bin/setsid /usr/bin/node "$WORKDIR/agent.js" "$STAGING/root-agent.token" ' + agentPort + ' "$STAGING/root-agent.status" "$STAGING/root-agent.log" "$WORKDIR" </dev/null >/dev/null 2>&1 &\n';
 }
 
 // Every service start stages a new archive-root-<id> folder and a signed archive in on-demand/, and nothing
