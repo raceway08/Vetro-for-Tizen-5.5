@@ -14,6 +14,7 @@ const names = Object.keys(parsed.manifest.files);
 
 assert.equal(parsed.manifest.version, require('../../app/package.json').version);
 assert.ok(names.includes('service/platform.js') && names.includes('service/root-agent.js'), 'the root adapter ships with updates');
+assert.ok(names.includes('service/root-agent-worker.js') && updater.okPath('service/root-agent-worker.js'), 'the FIFO worker ships in a path accepted by legacy updaters');
 assert.ok(names.includes('service/updater.js') && names.includes('payload/SamsungTvRootAgent.dll'));
 // 0.5.x refuses a bundle that lists a payload subfolder, so payload/net6 stays out while 0.5.x TVs update (#226).
 const oldOkPath = n => /^(?:service\/[A-Za-z0-9_.-]+\.js|native\/[A-Za-z0-9_.\/-]+|payload\/[A-Za-z0-9_.-]+|index\.html|icon\.png)$/.test(n);
