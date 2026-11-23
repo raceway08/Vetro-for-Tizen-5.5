@@ -23,7 +23,7 @@ const DISTRIBUTOR_PW = process.env.DIST_PW;
 
 function collectIntegration() {
     const files = require('../app/build.cjs').collectFiles().filter(file => decodeURIComponent(file.uri) !== 'service/platform.js');
-    ['platform.js','adb.js','sdb.js','tar.js','root-agent.js','root-agent-node.js','root-agent-worker.sh','debloat-commands.js','sdb-tunnel.js','root-preflight.js','root-preflight-capture.js','retry-policy.js'].forEach(name => {
+    ['platform.js','adb.js','sdb.js','tar.js','root-agent.js','root-agent-node.js','root-agent-worker.js','debloat-commands.js','sdb-tunnel.js','root-preflight.js','root-preflight-capture.js','retry-policy.js'].forEach(name => {
         files.push({uri: encodeURIComponent('service/' + name), data: fs.readFileSync(path.join(__dirname,'service',name))});
     });
     function addPayloads(relative) {
