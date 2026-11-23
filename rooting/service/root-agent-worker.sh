@@ -20,9 +20,9 @@ while IFS= read -r line <&3; do
         *) continue ;;
     esac
 
-    rest=\${line#EXEC"$TAB"}
-    sequence=\${rest%%"$TAB"*}
-    timeout=\${rest#*"$TAB"}
+    rest=${line#EXEC"$TAB"}
+    sequence=${rest%%"$TAB"*}
+    timeout=${rest#*"$TAB"}
 
     case "$sequence" in
         ''|*[!0-9]*)
