@@ -14,7 +14,7 @@
   <a href="https://discord.gg/Pe9BmthUar">Discord</a>
 </p>
 
-Vetro runs on your Samsung TV and gives you a dashboard, open from any computer or phone on your network. Replace Samsung's Home with a fast launcher, switch off what tracks you and wastes memory, and make the remote do what you want. It needs root access on the TV. Root is reported working on **Tizen 6 to 9** TVs (2021–2025), and the result depends on the model and its firmware. Older TVs get the dashboard and diagnostics only, and so does Tizen 10 for now, because its firmware blocks the way Vetro gets root. See [Compatibility](#compatibility).
+Vetro runs on your Samsung TV and gives you a dashboard, open from any computer or phone on your network. Replace Samsung's Home with a fast launcher, switch off what tracks you and wastes memory, and make the remote do what you want. It needs root access on the TV. Root is reported working on **Tizen 6 to 9** TVs (2021–2025), and the result depends on the model and its firmware. This fork adds an **experimental Tizen 5.5 root compatibility path** using Node.js 4.4 and .NET Core 3.0; its payloads must be built separately and it has not yet been verified on a physical TV. Other older TVs get the dashboard and diagnostics only, and so does Tizen 10 for now, because its firmware blocks the way Vetro gets root. See [Compatibility](#compatibility).
 
 > [!IMPORTANT]
 > **Install Vetro while your TV can still be rooted.** Samsung is pushing firmware updates that close the way Vetro gets root. One forced update already removed root from a 2022 TV, and that cannot be undone ([#223](https://github.com/andrearicci93/vetro/issues/223)). Vetro 0.7.0 adds **Block firmware and software updates** (Quick settings → General → Essential settings). It stops Samsung's update services (firmware, apps and packages, system parts), not only the Auto update setting in Samsung's menu, and applies the block again after every restart. USB recovery still works. It can help you keep root; it cannot promise it, and it cannot undo an update that has already arrived. The switch needs root, so it only works once Vetro runs with root. It is off by default; while it is on, Samsung's automatic updates do not install. Tried on a Q80A only. Without root, the network is what protects the TV: [blocking updates without root](app/docs/UPDATES-WITHOUT-ROOT.md).
@@ -145,7 +145,7 @@ Vetro is developed on a **Samsung Q80A**; everything else below comes from commu
 | **7 and 8** (2023–2024) | Reported working | Reported working | S90C, S95C, Q65D, QN90D |
 | **6.5** (2022) | Reported working | Reported working (the launcher needs Vetro 0.3.1 or newer) | Q60B, Q67B, QN85B, QN90B, S95B, BU8002, The Frame |
 | **6** (2021) | Reported working | Reported working; one TV needs the Host PC IP step to be confirmed ([#134](https://github.com/andrearicci93/vetro/issues/134)) | Q80A, Q70A, Q60A, QN85A, QN95A, AU7000, AU7170, AU7172 |
-| **5.5** (2020) | Reported working | Not available | TU7090, T4300 |
+| **5.5** (2020) | Reported working | **Experimental in this fork:** Node 4.4 / .NET Core 3.0 path; requires separately built payloads and has not yet been verified on a physical TV | TU7090, T4300 |
 | **5.0** (2019) | Not with the stock package | One Q80R works with a personal port ([#35](https://github.com/andrearicci93/vetro/issues/35)) | Q80R |
 | **4** (2018) | Reported working | Not available | NU7090 |
 
