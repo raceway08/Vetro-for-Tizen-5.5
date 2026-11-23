@@ -3,6 +3,7 @@
 const assert = require('assert').strict;
 const fs = require('fs');
 const path = require('path');
+const spawnSync = require('child_process').spawnSync;
 
 const service = path.join(__dirname, '..', 'service');
 const agent = fs.readFileSync(path.join(service, 'root-agent-node.js'), 'utf8');
@@ -12,6 +13,11 @@ const builder = fs.readFileSync(path.join(__dirname, '..', 'build.cjs'), 'utf8')
 
 // Parse the actual target-side source on the host test runner.
 new Function(agent);
+new Function(platform);
+if (process.platform !== 'win32') {
+  const shellCheck = spawnSync('/bin/sh', ['-n'], {input: worker, encoding: 'utf8'});
+  assert.equal(shellCheck.status, 0, shellCheck.stderr || 'shell worker syntax check failed');
+}
 assert.doesNotMatch(agent, /require\s*\(\s*['"]child_process['"]\s*\)/);
 assert.doesNotMatch(agent, /\.spawn\s*\(/);
 assert.match(agent, /FIFO_FLAGS\s*=\s*2050/);
