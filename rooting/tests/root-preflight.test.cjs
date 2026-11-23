@@ -72,7 +72,7 @@ function probe(overrides, fileSystem) {
         runtime: '3.0', hostFile: '/usr/bin/dotnet-launcher',
         hostCommand: '/usr/bin/dotnet-launcher --standalone', source: 'detected'
     });
-    assert.deepEqual(await probe({getcap: {ok: true, output: caps}}, files('3.0.0')), {
+    assert.deepEqual(await probe({dotnet: samsung, getcap: {ok: true, output: caps}}, files('3.0.0')), {
         runtime: '3.0', hostFile: '/usr/bin/dotnet',
         hostCommand: '/usr/bin/dotnet', source: 'detected'
     });
@@ -86,7 +86,7 @@ function probe(overrides, fileSystem) {
     const calls = [];
     const keyPair = await preflight.createSigningKeyPair((file, args) => {
         calls.push({file, args});
-        if (file === '/bin/sh' && args[1] === 'command -v openssl') {
+        if (file === '/bin/sh' && args[0] === '-c' && args[1] === 'command -v openssl') {
             return Promise.resolve({ok: true, output: '/usr/bin/openssl\n'});
         }
         if (file === '/bin/sh') return Promise.resolve({ok: true, output: ''});
@@ -100,7 +100,7 @@ function probe(overrides, fileSystem) {
     });
     assert.match(keyPair.privateKeyPem, /BEGIN RSA PRIVATE KEY/);
     assert.match(keyPair.publicKeyPem, /BEGIN PUBLIC KEY/);
-    assert.ok(calls.some(call => call.file === '/bin/sh' && call.args[1].indexOf('umask 077') >= 0));
+    assert.ok(calls.some(call => call.file === '/bin/sh' && call.args[0] === '-c' && call.args[1].indexOf('umask 077') >= 0));
     assert.ok(calls.some(call => call.file === '/bin/rm' && call.args[0] === '-f'));
 
     const context = require('./provider-harness.cjs')(path.resolve(__dirname, '..')).context;

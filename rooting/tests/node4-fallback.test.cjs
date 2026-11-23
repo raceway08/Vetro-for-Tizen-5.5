@@ -19,7 +19,7 @@ assert.equal(verifier.verify(publicPem, signature), true);
 let calls = 0;
 preflight.createSigningKeyPair((file, args) => {
     calls++;
-    if (file === '/bin/sh' && args[1] === 'command -v openssl') {
+    if (file === '/bin/sh' && args[0] === '-c' && args[1] === 'command -v openssl') {
         return Promise.resolve({ok: true, output: '/usr/bin/openssl\n'});
     }
     if (file === '/bin/sh') return Promise.resolve({ok: true, output: ''});
