@@ -28,11 +28,7 @@ The TV runs this adapter inside the package's web service, and Tizen 4 and 5.5 r
 that service on Node.js 4.4. The adapter is therefore ES5, and the test suite
 parses every packaged service file for the syntax and built-ins that runtime lacks:
 one destructuring pattern is a SyntaxError while loading, and the service never
-listens. Where the runtime cannot prepare the agent at all —
-`crypto.generateKeyPairSync` needs Node 10.12+ — `start()` records
-`platformUnsupported` once and stops retrying; the dashboard, the app list and
-diagnostics keep working, and the sections that need the agent report
-`no-root-agent`.
+listens. On Tizen 5.5, Node 4.4 cannot use `crypto.generateKeyPairSync`; the adapter generates an ephemeral RSA key with the TV's OpenSSL and signs it with `crypto.createSign`. The Tizen 5.5 root payloads must be built separately for .NET Core 3.0, and the signed Samsung host is invoked as `/usr/bin/dotnet-launcher --standalone`. This path is experimental and is not confirmed on every Tizen 5.5 model. If OpenSSL, the required file capabilities or the .NET 3.0 payloads are missing, the root agent does not connect; dashboard, app inventory and diagnostics remain available.
 
 Before building, install dependencies with `npm ci` in `on-boot-probe`, then set
 `AUTHOR_P12`, `DIST_P12`, `AUTHOR_PW`, `DIST_PW` and optionally `OUT` using your own
@@ -76,8 +72,7 @@ checks as the SDK user through the existing injection route:
 `/usr/bin/dotnet --list-runtimes`, effective file capabilities via `getcap`,
 and `/usr/bin/tar --help` for `--to-command`. A Samsung apphost rejecting
 `--list-runtimes` with exit 255 is handled by resolving
-`/usr/share/dotnet.tizen/netcoreapp` and checking both CLR files. Only .NET 3.1
-or 6+ is accepted; the active runtime is detected, never inferred from model/year.
+`/usr/share/dotnet.tizen/netcoreapp` and checking both CLR files. .NET 3.0, 3.1 or 6+ is accepted; the active runtime is detected, never inferred from model/year. Tizen 5.5 uses the active `/usr/share/dotnet.tizen/netcoreapp` link and verifies `dotnet-launcher` capabilities instead of assuming a `dotnet` muxer.
 The web-service host does not spawn subprocesses: a bounded, loopback-only
 callback captures each probe's output and exit status, with temporary scripts
 removed on success or timeout. A failed or unavailable check prevents launch
@@ -85,11 +80,7 @@ and retains a bounded diagnostic
 failure while the normal boot retry remains available. These local checks do not
 prove SDB injection will work or that a privileged callback will arrive.
 
-The root launcher and root agent use the existing .NET 3.1 payloads, or the new
-`payload/net6/` builds for 6+. Runtime configs use `LatestPatch` for 3.1 and
-`Major` for 6+. The latter permits later major runtimes; it is not hardware
-validation. This selection covers the root bootstrap and agent only; the dock
-and remote-input helper retain their existing runtime requirements.
+The root launcher and root agent use the existing .NET 3.1 payloads, the new `payload/*.tizen55.*` files for .NET 3.0, or the `payload/net6/` builds for 6+. Build the Tizen 5.5 pair with `VETRO_TIZEN55=1 node rooting/build-root-payloads.cjs` on a machine with the .NET 3.0 targeting pack. The 3.0 runtime config uses `LatestPatch`; the .NET 6 config uses `Major`. The .NET 3.0 payloads use the signed standalone launcher and have not yet been validated on a physical TU8000. This selection covers the root bootstrap and agent only; the dock and remote-input helper retain their own build requirements.
 
 To rebuild the .NET 6 pair from the retained upstream C# sources (requires a .NET
 SDK with net6.0 targeting-pack restore access):

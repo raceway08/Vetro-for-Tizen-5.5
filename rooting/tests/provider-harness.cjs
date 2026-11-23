@@ -3,7 +3,10 @@ const fs = require('fs'); const path = require('path'); const vm = require('vm')
 module.exports = function loadProvider(root) {
     const dependencies = {
         fs: {readFileSync: function () {return '';}},
-        './root-preflight.js': {checkTarget: () => Promise.resolve({runtime: '3.1', source: 'detected'})},
+        './root-preflight.js': {
+            checkTarget: () => Promise.resolve({runtime: '3.1', hostFile: '/usr/bin/dotnet', hostCommand: '/usr/bin/dotnet', source: 'detected'}),
+            createSigningKeyPair: () => Promise.resolve({privateKeyPem: 'test-private-key', publicKeyPem: 'test-public-key'})
+        },
         './root-agent.js': {RootAgentServer: function () {this.start = function () {}; this.close = function () {};}},
         // Keep the status test offline: a real listener would bind a port and
         // hold the event loop open after the assertions.

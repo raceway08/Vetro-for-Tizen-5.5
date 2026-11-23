@@ -4,7 +4,9 @@ var fs = require('fs');
 var path = require('path');
 var crypto = require('crypto');
 var sdb = require('./sdb.js');
-var checkTarget = require('./root-preflight.js').checkTarget;
+var rootPreflight = require('./root-preflight.js');
+var checkTarget = rootPreflight.checkTarget;
+var createSigningKeyPair = rootPreflight.createSigningKeyPair;
 var createPreflightRunner = require('./root-preflight-capture.js').createRunner;
 var tarGz = require('./tar.js').tarGz;
 var RootAgentServer = require('./root-agent.js').RootAgentServer;
@@ -80,10 +82,14 @@ function ensureDir(p) {
 // Start the agent with detached standard streams so the archive launcher
 // returns and releases SDB command processing. setsid() in the agent alone
 // does not release the waiting tar/archive parents. Paths are baked in once.
-function buildLaunchScript(agentPort) {
+function runtimeHost(runtime) {
+    return runtime === '3.0' ? '/usr/bin/dotnet-launcher --standalone' : '/usr/bin/dotnet';
+}
+
+function buildLaunchScript(agentPort, runtime) {
     var staging = STAGE + '/' + pkg;
     return '#!/bin/sh\n' +
-        '/usr/bin/dotnet ' + staging + '/SamsungTvRootAgent.dll ' +
+        runtimeHost(runtime) + ' ' + staging + '/SamsungTvRootAgent.dll ' +
         '127.0.0.1 ' + agentPort + ' ' +
         staging + '/root-agent.token ' +
         staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\n';
@@ -138,22 +144,13 @@ function cleanStage(keep) {
     return removed;
 }
 
-function prepare(agentPort, runtime) {
-    // crypto.generateKeyPairSync and KeyObject.export need Node 10.12+. Tizen 4
-    // and 5.5 run Node 4.4, where the adapter must not touch the file system or
-    // keep retrying: report it once and leave the rest of the service running.
-    if (typeof crypto.generateKeyPairSync !== 'function') {
-        var unsupported = new Error('root agent needs Node 10.12+ (this runtime has ' + process.version + ')');
-        unsupported.code = 'platformUnsupported';
-        throw unsupported;
+function prepare(agentPort, runtime, signingKeys) {
+    if (!signingKeys || typeof signingKeys.privateKeyPem !== 'string' || typeof signingKeys.publicKeyPem !== 'string') {
+        throw new Error('per-start signing key pair is unavailable');
     }
 
     var staging = ensureDir(STAGE + '/' + pkg);
     var onDemand = ensureDir(STAGE + '/on-demand');
-
-    var keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-    var publicPem = keys.publicKey.export({ type: 'spki', format: 'pem' });
-    var privatePem = keys.privateKey.export({ type: 'pkcs8', format: 'pem' });
 
     var bundle = path.join(__dirname, '..', 'payload');
     if (runtime === '6.0') bundle = path.join(bundle, 'net6');
@@ -162,7 +159,8 @@ function prepare(agentPort, runtime) {
         'SamsungTvRootAgent.dll', 'SamsungTvRootAgent.runtimeconfig.json', 'SamsungTvRootAgent.deps.json'
     ];
     names.forEach(function (n) {
-        var data = fs.readFileSync(path.join(bundle, n));
+        var sourceName = runtime === '3.0' ? n.replace(/\.(dll|runtimeconfig\.json|deps\.json)$/, '.tizen55.$1') : n;
+        var data = fs.readFileSync(path.join(bundle, sourceName));
         if (/\.runtimeconfig\.json$/.test(n)) {
             var config = JSON.parse(data.toString('utf8'));
             config.runtimeOptions.rollForward = runtime === '6.0' ? 'Major' : 'LatestPatch';
@@ -171,12 +169,14 @@ function prepare(agentPort, runtime) {
         fs.writeFileSync(path.join(staging, n), data);
     });
 
-    fs.writeFileSync(path.join(staging, 'public.pem'), publicPem);
+    fs.writeFileSync(path.join(staging, 'public.pem'), signingKeys.publicKeyPem);
     fs.writeFileSync(path.join(staging, 'passwd'), 'owner:x:0:0:owner:/home/owner:/bin/sh\n');
 
-    var launch = buildLaunchScript(agentPort);
+    var launch = buildLaunchScript(agentPort, runtime);
     var tarBuf = tarGz([{ name: 'launch.sh', data: launch, mode: 448 /* 0o700 */, mtime: 0 }]);
-    var signature = crypto.sign('RSA-SHA256', tarBuf, privatePem);
+    var signer = crypto.createSign('RSA-SHA256');
+    signer.update(tarBuf);
+    var signature = signer.sign(signingKeys.privateKeyPem);
 
     fs.writeFileSync(path.join(onDemand, pkg + '.tar.gz'), tarBuf);
     fs.writeFileSync(path.join(onDemand, pkg + '.tar.gz.signature'), signature);
@@ -224,26 +224,6 @@ function fastRetry() { return lossHr !== null && hrMs(lossHr) < FAST_WINDOW_MS &
 function pushAttempt(entry) {
     state.attempts.push(entry);
     if (state.attempts.length > 40) state.attempts.shift();
-}
-
-function prepareForRuntime(port) {
-    try {
-        prepare(port);
-        delete state.prepareError;
-    } catch (e) {
-        state.prepareError = String(e.message || e);
-        rootFailure('preparation', e.code === 'platformUnsupported' ? 'platformUnsupported' : 'prepare-failed');
-        if (e.code !== 'platformUnsupported') return;
-        rootPhase('unsupported');
-        // This runtime will never be able to prepare the agent, so stop the
-        // retry loop (which rewrote the status file every few seconds) and the
-        // loopback listener that nothing can connect to.
-        state.unsupported = true;
-        if (agentServer) {
-            try { agentServer.close(); } catch (ignored) {}
-            agentServer = null;
-        }
-    }
 }
 
 // Report only phases we can observe. An SDB stream finishing does not prove
@@ -414,7 +394,6 @@ function startAgent() {
             if (!state.running) return;
             if (!startHr) startHr = process.hrtime();
             state.agentPort = port;
-            if (typeof crypto.generateKeyPairSync !== 'function') prepareForRuntime(port);
             relaunch();
         });
     });
@@ -441,6 +420,7 @@ function relaunch() {
     if (launchClient) { try { sdb.close(launchClient); } catch (e) {} launchClient = null; }
 
     var stage = 'sdb-handshake';
+    var signingKeys = null;
     rootPhase('sdb-handshake');
     state.preflight = null;
     var entry = { t: Date.now(), phase: 'launch' };
@@ -459,16 +439,25 @@ function relaunch() {
         lap('handshakeMs');
         stage = 'preflight';
         rootPhase('preflight');
-        return checkTarget({run: createPreflightRunner(client, buildInjection)});
+        var runner = createPreflightRunner(client, buildInjection);
+        return checkTarget({run: runner}).then(function (assessment) {
+            if (!state.running || gen !== launchGen || agentConnected) return null;
+            lap('preflightMs');
+            state.preflight = assessment;
+            stage = 'key-generation';
+            rootPhase('preparing');
+            return createSigningKeyPair(runner).then(function (keys) {
+                signingKeys = keys;
+                return assessment;
+            });
+        });
     }).then(function (assessment) {
-        if (!state.running || gen !== launchGen || agentConnected) return;
-        lap('preflightMs');
-        state.preflight = assessment;
+        if (!assessment || !state.running || gen !== launchGen || agentConnected) return;
         stage = 'preparation';
         rootPhase('preparing');
         if (!state.prepared || state.preparedRuntime !== assessment.runtime) {
             state.prepared = false;
-            try { prepare(state.agentPort, assessment.runtime); } catch (e) {
+            try { prepare(state.agentPort, assessment.runtime, signingKeys); } catch (e) {
                 state.prepareError = String(e.message || e);
                 e.code = 'prepare-failed';
                 throw e;
@@ -491,7 +480,7 @@ function relaunch() {
                 return;
             }
             launchClient = client;
-            var launchCmd = '/usr/bin/dotnet ' + STAGE + '/' + pkg + '/SamsungTvArchiveRoot.dll ' + pkg;
+            var launchCmd = runtimeHost(state.preflight.runtime) + ' ' + STAGE + '/' + pkg + '/SamsungTvArchiveRoot.dll ' + pkg;
             var injection = buildInjection(launchCmd);
             entry.connect = 'ok';
             rootPhase('launch-command');
