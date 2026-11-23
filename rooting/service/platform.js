@@ -79,16 +79,42 @@ function ensureDir(p) {
     return p;
 }
 
-// Start the agent with detached standard streams so the archive launcher
-// returns and releases SDB command processing. setsid() in the agent alone
-// does not release the waiting tar/archive parents. Paths are baked in once.
-function buildLaunchScript(agentPort, hostCommand) {
+// The .NET agent remains the default. Tizen 5.5 runs the web service on
+// Node 4.4.3, whose bundled libuv 1.8.0 aborts in uv_close even for a trivial
+// child_process.spawn(). For that exact runtime pair, the signed archive
+// starts a small shell worker and a Node agent joined by FIFOs instead.
+function shellQuote(value) {
+    return "'" + String(value).replace(/'/g, "'\\''") + "'";
+}
+
+function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
     var staging = STAGE + '/' + pkg;
-    return '#!/bin/sh\n' +
-        hostCommand + ' ' + staging + '/SamsungTvRootAgent.dll ' +
-        '127.0.0.1 ' + agentPort + ' ' +
-        staging + '/root-agent.token ' +
-        staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\n';
+    if (!useNodeFifo) {
+        return '#!/bin/sh\\n' +
+            hostCommand + ' ' + staging + '/SamsungTvRootAgent.dll ' +
+            '127.0.0.1 ' + agentPort + ' ' +
+            staging + '/root-agent.token ' +
+            staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\\n';
+    }
+
+    var nodeAgent = fs.readFileSync(path.join(__dirname, 'root-agent-node.js'));
+    var worker = fs.readFileSync(path.join(__dirname, 'root-agent-worker.sh'));
+    var nodeB64 = new Buffer(nodeAgent).toString('base64');
+    var workerB64 = new Buffer(worker).toString('base64');
+
+    return '#!/bin/sh\\n' +
+        'umask 077\\n' +
+        'PATH=/usr/bin:/bin\\nexport PATH\\n' +
+        'STAGING=' + shellQuote(staging) + '\\n' +
+        'WORKDIR="$STAGING/agent-runtime-$"\\n' +
+        '/bin/mkdir -m 700 "$WORKDIR" || exit 1\\n' +
+        "printf '%s' " + shellQuote(nodeB64) + ' | /usr/bin/base64 -d > "$WORKDIR/agent.js" || exit 1\\n' +
+        "printf '%s' " + shellQuote(workerB64) + ' | /usr/bin/base64 -d > "$WORKDIR/worker.sh" || exit 1\\n' +
+        '/usr/bin/mkfifo "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" || exit 1\\n' +
+        '/bin/chmod 600 "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr" "$WORKDIR/agent.js" "$WORKDIR/worker.sh" || exit 1\\n' +
+        'WORKER_SOURCE=$(/bin/cat "$WORKDIR/worker.sh") || exit 1\\n' +
+        '/usr/bin/setsid /bin/sh -c "$WORKER_SOURCE" vetro-worker "$WORKDIR" </dev/null >/dev/null 2>&1 &\\n' +
+        '/usr/bin/setsid /usr/bin/node "$WORKDIR/agent.js" "$STAGING/root-agent.token" ' + agentPort + ' "$STAGING/root-agent.status" "$STAGING/root-agent.log" "$WORKDIR" </dev/null >/dev/null 2>&1 &\\n';
 }
 
 // Every service start stages a new archive-root-<id> folder and a signed archive in on-demand/, and nothing
@@ -168,7 +194,9 @@ function prepare(agentPort, runtime, signingKeys, hostCommand) {
     fs.writeFileSync(path.join(staging, 'public.pem'), signingKeys.publicKeyPem);
     fs.writeFileSync(path.join(staging, 'passwd'), 'owner:x:0:0:owner:/home/owner:/bin/sh\n');
 
-    var launch = buildLaunchScript(agentPort, hostCommand);
+    var useNodeFifo = runtime === '3.0' && process.version === 'v4.4.3';
+    var launch = buildLaunchScript(agentPort, hostCommand, useNodeFifo);
+    state.rootAgentBackend = useNodeFifo ? 'node-fifo' : 'dotnet';
     var tarBuf = tarGz([{ name: 'launch.sh', data: launch, mode: 448 /* 0o700 */, mtime: 0 }]);
     var signer = crypto.createSign('RSA-SHA256');
     signer.update(tarBuf);
