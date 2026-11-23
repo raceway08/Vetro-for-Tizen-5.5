@@ -87,7 +87,9 @@ function checkTarget(options) {
         : Promise.resolve().then(function () { return runtimeFromActiveLink(files); });
 
     return runtimePromise.then(function (runtime) {
-        var hostFile = runtime === '3.0' ? '/usr/bin/dotnet-launcher' : '/usr/bin/dotnet';
+        var hostFile = hasMuxer ? '/usr/bin/dotnet' : '/usr/bin/dotnet-launcher';
+        var hostCommand = hasMuxer ? '/usr/bin/dotnet' : '/usr/bin/dotnet-launcher --standalone';
+        if (!hasMuxer && runtime !== '3.0') throw failure('dotnet-host-missing');
         if (!fileExists(files, hostFile)) {
             throw failure(runtime === '3.0' ? 'tizen55-launcher-missing' : 'dotnet-host-missing');
         }
@@ -105,9 +107,7 @@ function checkTarget(options) {
                 return {
                     runtime: runtime,
                     hostFile: hostFile,
-                    hostCommand: runtime === '3.0'
-                        ? '/usr/bin/dotnet-launcher --standalone'
-                        : '/usr/bin/dotnet',
+                    hostCommand: hostCommand,
                     source: 'detected'
                 };
             });

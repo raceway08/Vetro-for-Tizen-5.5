@@ -82,14 +82,10 @@ function ensureDir(p) {
 // Start the agent with detached standard streams so the archive launcher
 // returns and releases SDB command processing. setsid() in the agent alone
 // does not release the waiting tar/archive parents. Paths are baked in once.
-function runtimeHost(runtime) {
-    return runtime === '3.0' ? '/usr/bin/dotnet-launcher --standalone' : '/usr/bin/dotnet';
-}
-
-function buildLaunchScript(agentPort, runtime) {
+function buildLaunchScript(agentPort, hostCommand) {
     var staging = STAGE + '/' + pkg;
     return '#!/bin/sh\n' +
-        runtimeHost(runtime) + ' ' + staging + '/SamsungTvRootAgent.dll ' +
+        hostCommand + ' ' + staging + '/SamsungTvRootAgent.dll ' +
         '127.0.0.1 ' + agentPort + ' ' +
         staging + '/root-agent.token ' +
         staging + ' </dev/null >' + staging + '/root-agent.log 2>&1 &\n';
@@ -144,7 +140,7 @@ function cleanStage(keep) {
     return removed;
 }
 
-function prepare(agentPort, runtime, signingKeys) {
+function prepare(agentPort, runtime, signingKeys, hostCommand) {
     if (!signingKeys || typeof signingKeys.privateKeyPem !== 'string' || typeof signingKeys.publicKeyPem !== 'string') {
         throw new Error('per-start signing key pair is unavailable');
     }
@@ -172,7 +168,7 @@ function prepare(agentPort, runtime, signingKeys) {
     fs.writeFileSync(path.join(staging, 'public.pem'), signingKeys.publicKeyPem);
     fs.writeFileSync(path.join(staging, 'passwd'), 'owner:x:0:0:owner:/home/owner:/bin/sh\n');
 
-    var launch = buildLaunchScript(agentPort, runtime);
+    var launch = buildLaunchScript(agentPort, hostCommand);
     var tarBuf = tarGz([{ name: 'launch.sh', data: launch, mode: 448 /* 0o700 */, mtime: 0 }]);
     var signer = crypto.createSign('RSA-SHA256');
     signer.update(tarBuf);
@@ -420,7 +416,6 @@ function relaunch() {
     if (launchClient) { try { sdb.close(launchClient); } catch (e) {} launchClient = null; }
 
     var stage = 'sdb-handshake';
-    var signingKeys = null;
     rootPhase('sdb-handshake');
     state.preflight = null;
     var entry = { t: Date.now(), phase: 'launch' };
@@ -444,20 +439,23 @@ function relaunch() {
             if (!state.running || gen !== launchGen || agentConnected) return null;
             lap('preflightMs');
             state.preflight = assessment;
+            if (state.prepared && state.preparedRuntime === assessment.runtime) {
+                return {assessment: assessment, signingKeys: null};
+            }
             stage = 'key-generation';
             rootPhase('preparing');
             return createSigningKeyPair(runner).then(function (keys) {
-                signingKeys = keys;
-                return assessment;
+                return {assessment: assessment, signingKeys: keys};
             });
         });
-    }).then(function (assessment) {
-        if (!assessment || !state.running || gen !== launchGen || agentConnected) return;
+    }).then(function (prepared) {
+        if (!prepared || !state.running || gen !== launchGen || agentConnected) return;
+        var assessment = prepared.assessment;
         stage = 'preparation';
         rootPhase('preparing');
         if (!state.prepared || state.preparedRuntime !== assessment.runtime) {
             state.prepared = false;
-            try { prepare(state.agentPort, assessment.runtime, signingKeys); } catch (e) {
+            try { prepare(state.agentPort, assessment.runtime, prepared.signingKeys, assessment.hostCommand); } catch (e) {
                 state.prepareError = String(e.message || e);
                 e.code = 'prepare-failed';
                 throw e;
@@ -480,7 +478,7 @@ function relaunch() {
                 return;
             }
             launchClient = client;
-            var launchCmd = runtimeHost(state.preflight.runtime) + ' ' + STAGE + '/' + pkg + '/SamsungTvArchiveRoot.dll ' + pkg;
+            var launchCmd = state.preflight.hostCommand + ' ' + STAGE + '/' + pkg + '/SamsungTvArchiveRoot.dll ' + pkg;
             var injection = buildInjection(launchCmd);
             entry.connect = 'ok';
             rootPhase('launch-command');

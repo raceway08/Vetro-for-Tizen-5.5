@@ -72,6 +72,10 @@ function probe(overrides, fileSystem) {
         runtime: '3.0', hostFile: '/usr/bin/dotnet-launcher',
         hostCommand: '/usr/bin/dotnet-launcher --standalone', source: 'detected'
     });
+    assert.deepEqual(await probe({getcap: {ok: true, output: caps}}, files('3.0.0')), {
+        runtime: '3.0', hostFile: '/usr/bin/dotnet',
+        hostCommand: '/usr/bin/dotnet', source: 'detected'
+    });
     await assert.rejects(probe({getcap: {ok: false}}), {code: 'capabilities-probe-failed'});
     await assert.rejects(probe({getcap: {ok: true, output: caps.replace('cap_sys_admin+ep', 'cap_sys_admin+p')}}), {code: 'dotnet-capabilities-missing'});
     await assert.rejects(probe({getcap: {ok: true, output: caps.split('\n')[0]}}), {code: 'launcher-capabilities-missing'});
