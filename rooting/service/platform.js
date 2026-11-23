@@ -12,6 +12,7 @@ var tarGz = require('./tar.js').tarGz;
 var RootAgentServer = require('./root-agent.js').RootAgentServer;
 var TunnelServer = require('./sdb-tunnel.js').TunnelServer;
 var retryPolicy = require('./retry-policy.js');
+var rootAgentWorker = require('./root-agent-worker.js');
 var SDB_TUNNEL_PORT = 26201;
 var SDB_TUNNEL_PORT_ERROR = null;
 (function () {
@@ -98,7 +99,7 @@ function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
     }
 
     var nodeAgent = fs.readFileSync(path.join(__dirname, 'root-agent-node.js'));
-    var worker = fs.readFileSync(path.join(__dirname, 'root-agent-worker.sh'));
+    var worker = new Buffer(rootAgentWorker, 'utf8');
     var nodeB64 = new Buffer(nodeAgent).toString('base64');
     var workerB64 = new Buffer(worker).toString('base64');
 
