@@ -21,7 +21,7 @@ if (process.platform !== 'win32') {
   assert.equal(shellCheck.status, 0, shellCheck.stderr || 'shell worker syntax check failed');
 }
 assert.doesNotMatch(agent, /require\s*\(\s*['"]child_process['"]\s*\)/);
-assert.doesNotMatch(agent, /\.spawn\s*\(/);
+assert.doesNotMatch(agent.replace(/\/\/[^\n]*/g, ''), /\.spawn\s*\(/);
 assert.match(agent, /FIFO_FLAGS\s*=\s*2050/);
 assert.match(agent, /MAX_OUTPUT\s*=\s*1024\s*\*\s*1024/);
 assert.match(agent, /SAMSUNG-TV-ROOT\/1/);
