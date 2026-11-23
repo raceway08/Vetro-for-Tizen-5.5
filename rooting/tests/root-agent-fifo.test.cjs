@@ -7,12 +7,14 @@ const spawnSync = require('child_process').spawnSync;
 
 const service = path.join(__dirname, '..', 'service');
 const agent = fs.readFileSync(path.join(service, 'root-agent-node.js'), 'utf8');
-const worker = fs.readFileSync(path.join(service, 'root-agent-worker.sh'), 'utf8');
+const workerModule = fs.readFileSync(path.join(service, 'root-agent-worker.js'), 'utf8');
+const worker = require(path.join(service, 'root-agent-worker.js'));
 const platform = fs.readFileSync(path.join(service, 'platform.js'), 'utf8');
 const builder = fs.readFileSync(path.join(__dirname, '..', 'build.cjs'), 'utf8');
 
 // Parse the actual target-side source on the host test runner.
 new Function(agent);
+new Function(workerModule);
 new Function(platform);
 if (process.platform !== 'win32') {
   const shellCheck = spawnSync('/bin/sh', ['-n'], {input: worker, encoding: 'utf8'});
@@ -36,6 +38,6 @@ assert.match(worker, /printf 'RESULT\\t%s\\t%s\\t%s\\n'/);
 assert.match(platform, /runtime === '3\.0' && process\.version === 'v4\.4\.3'/);
 assert.match(platform, /agent-runtime-\$\$/);
 assert.match(platform, /setsid \/bin\/sh -c "\$WORKER_SOURCE"/);
-assert.match(builder, /'root-agent-node\.js','root-agent-worker\.sh'/);
+assert.match(builder, /'root-agent-node\.js','root-agent-worker\.js'/);
 
 console.log('PASS Node 4.4 FIFO root-agent compatibility and packaging');
