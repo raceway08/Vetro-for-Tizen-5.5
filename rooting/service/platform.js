@@ -106,7 +106,7 @@ function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
         'umask 077\n' +
         'PATH=/usr/bin:/bin\nexport PATH\n' +
         'STAGING=' + shellQuote(staging) + '\n' +
-        'WORKDIR="$STAGING/agent-runtime-$"\n' +
+        'WORKDIR="$STAGING/agent-runtime-$$"\n' +
         '/bin/mkdir -m 700 "$WORKDIR" || exit 1\n' +
         "printf '%s' " + shellQuote(nodeB64) + ' | /usr/bin/base64 -d > "$WORKDIR/agent.js" || exit 1\n' +
         "printf '%s' " + shellQuote(workerB64) + ' | /usr/bin/base64 -d > "$WORKDIR/worker.sh" || exit 1\n' +
