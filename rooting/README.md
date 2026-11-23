@@ -80,6 +80,16 @@ and retains a bounded diagnostic
 failure while the normal boot retry remains available. These local checks do not
 prove SDB injection will work or that a privileged callback will arrive.
 
+On Tizen 5.5, the web service is Node 4.4.3 with libuv 1.8.0. On the TU8000
+test device, even a trivial `child_process.spawn()` aborts in libuv's
+`uv_close` assertion. For that exact Node/runtime combination, the signed
+archive launch script starts a Node protocol agent and a detached shell command
+worker connected by four local FIFOs. Node handles the authenticated callback,
+protocol framing and bounded output capture; the worker handles command
+execution and timeout process-group cleanup. Other runtime combinations keep
+the .NET root agent. The FIFO implementation is experimental until it has been
+validated on the target TV and its restart/standby lifecycle.
+
 The root launcher and root agent use the existing .NET 3.1 payloads, the new `payload/*.tizen55.*` files for .NET 3.0, or the `payload/net6/` builds for 6+. Build the Tizen 5.5 pair with `VETRO_TIZEN55=1 node rooting/build-root-payloads.cjs` on a machine with the .NET 3.0 targeting pack. The 3.0 runtime config uses `LatestPatch`; the .NET 6 config uses `Major`. The .NET 3.0 payloads use the signed standalone launcher and have not yet been validated on a physical TU8000. This selection covers the root bootstrap and agent only; the dock and remote-input helper retain their own build requirements.
 
 To rebuild the .NET 6 pair from the retained upstream C# sources (requires a .NET
