@@ -3,6 +3,12 @@
 # The images come straight from dock/res when the package is built (app/build.cjs).
 set -e
 cd "$(dirname "$0")"
-dotnet build -c Release Launcher.csproj
-cp bin/Release/netcoreapp3.1/tvlauncher-dotnet.dll bin/Release/netcoreapp3.1/tvlauncher-dotnet.runtimeconfig.json ../app/native/dock/
+if [ "${VETRO_TIZEN55:-0}" = "1" ]; then
+    FRAMEWORK=netcoreapp3.0
+    dotnet build -c Release Launcher.csproj -p:VETRO_TIZEN55=true
+else
+    FRAMEWORK=netcoreapp3.1
+    dotnet build -c Release Launcher.csproj
+fi
+cp "bin/Release/$FRAMEWORK/tvlauncher-dotnet.dll" "bin/Release/$FRAMEWORK/tvlauncher-dotnet.runtimeconfig.json" ../app/native/dock/
 echo "copied to app/native/dock/"

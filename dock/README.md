@@ -1,8 +1,9 @@
 # Vetro launcher
 
 A minimal launcher for a rooted Samsung Tizen TV, written in C# against the TV's own EFL
-libraries and run with the TV's `dotnet`. Vetro starts and stops it from its **Launcher**
-tab; it is off until you turn it on.
+libraries. Vetro starts and stops it from its **Launcher** tab; it is off until you turn it on.
+The default build targets .NET Core 3.1 and uses `/usr/bin/dotnet`. The Tizen 5.5 build
+targets .NET Core 3.0 and uses the TV's signed `/usr/bin/dotnet-launcher --standalone` host.
 
 The launcher is a bundled Vetro plugin: `app/service/plugin-launcher.js` owns supervision and API
 actions, and the existing `/dock` URLs are aliases. Its native files still ship with Vetro and are
@@ -74,7 +75,8 @@ name labels and no clock, so the label styling options are not carried either.
 ## Build
 
 ```sh
-dotnet build -c Release Launcher.csproj   # targets netcoreapp3.1, the runtime on the TV
+dotnet build -c Release Launcher.csproj                  # default: netcoreapp3.1
+VETRO_TIZEN55=1 sh dock/build.sh                         # Tizen 5.5: netcoreapp3.0
 ```
 
 Run `sh dock/build.sh` from the repository root to build and copy the native DLL and runtime config

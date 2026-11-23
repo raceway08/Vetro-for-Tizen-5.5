@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework Condition="'$(VETRO_TIZEN55)' == 'true'">netcoreapp3.0</TargetFramework>
+    <TargetFramework Condition="'$(VETRO_TIZEN55)' != 'true'">netcoreapp3.1</TargetFramework>
     <AssemblyName>tvlauncher-dotnet</AssemblyName>
     <RootNamespace>Launcher</RootNamespace>
     <Nullable>disable</Nullable>

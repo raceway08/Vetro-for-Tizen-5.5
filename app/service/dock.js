@@ -72,6 +72,16 @@ var APP_GONE_ROUNDS = 2;                               // and given up on when t
 function wrap(s) { return 'echo ' + Buffer.from(s).toString('base64') + ' | base64 -d | sh'; }
 function q(s) { return "'" + String(s).replace(QUOTE_RE, "'\\''") + "'"; }
 
+function dotnetHost() {
+    // Tizen 5.5 TV firmware may not ship the dotnet muxer. Its signed launcher
+    // can run a netcoreapp3.0 assembly with --standalone. The dock itself does
+    // not use the capability-based archive bootstrap.
+    if (fs.existsSync('/usr/bin/dotnet')) return '/usr/bin/dotnet';
+    if (fs.existsSync('/usr/bin/dotnet-launcher')) return '/usr/bin/dotnet-launcher --standalone';
+    // Keep the historical path as the final fallback for unusual package layouts.
+    return '/usr/bin/dotnet';
+}
+
 // The cheap "is it running" check: the pid file, then the command line of that pid, read with shell builtins only (no
 // pipe, no other program), sent as one line without the base64 wrapper, so the root agent starts one shell and nothing
 // else (the full probe below starts about ten processes). Same meaning as the probe: the pid is alive AND its command
@@ -486,6 +496,7 @@ Dock.prototype.cardsShown = function () {
 // dock does not leave on SIGTERM. If systemd-run is missing or refuses, the old detached start is used.
 Dock.prototype.startScript = function () {
     var env = 'HOME=/home/owner XDG_RUNTIME_DIR=/run WAYLAND_DISPLAY=wayland-0 TVLAUNCHER_ENGINE=egl TVLAUNCHER_DIR=' + RUN_DIR;
+    var host = dotnetHost();
     var state = this.readState();
     // Custom mode: headless. The one-line list only gives the process something to load; the window is never shown.
     var args = DLL + ' --apps ' + q(state.customApp ? this.customAppsFile : this.appsFile) + ' --inputs ' + q(this.inputListPath()) +
@@ -503,8 +514,8 @@ Dock.prototype.startScript = function () {
         'rm -f ' + FIFO,
         'cd ' + q(this.dir),
         'systemd-run --unit=' + UNIT + ' --collect -p WorkingDirectory=' + q(this.dir) + ' -p KillSignal=SIGKILL -p StandardOutput=null -p StandardError=null ' +
-            '/usr/bin/env ' + env + ' /usr/bin/dotnet ' + args + ' >/dev/null 2>&1 || ' +
-        '{ ' + env + ' setsid nohup /usr/bin/dotnet ' + args + ' </dev/null >/dev/null 2>&1 & }',
+            '/usr/bin/env ' + env + ' ' + host + ' ' + args + ' >/dev/null 2>&1 || ' +
+        '{ ' + env + ' setsid nohup ' + host + ' ' + args + ' </dev/null >/dev/null 2>&1 & }',
         PREVIEW_OFF,
         'echo started'
     ].join('\n');
