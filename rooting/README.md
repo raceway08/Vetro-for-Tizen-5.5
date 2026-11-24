@@ -10,8 +10,11 @@ none of this implementation.
 - `tests/`: isolated lifecycle, authentication, injection validation and detached-launch tests.
 - `smb-inbox/`: optional RSA-signed command inbox for a TV that already has an independent root shell; it is a manually started helper, not a root-acquisition backend.
 - `smb-inbox/tu8000-remote-pc-preflight.sh` and `smb-inbox/TU8000-BOOT-PERSISTENCE.md`: read-only TU8000 firmware/helper/carrier audit; not a persistence installer.
+- `smb-inbox/TU8000-TEMPORARY-ROOT.md`: installation and manual temporary root-agent handoff for a TU8000 with an already-open Remote PC/CIFS root shell; it does not install boot persistence.
 - `on-boot-probe/package*.json`: signing dependency manifests. Historical prototypes
   and device material are local-only; they are not release dependencies.
+
+On Tizen 5.5 / Node 4.4.3, the adapter also stages a temporary manual root-agent handoff for an already-authenticated `System::Privileged` shell. Its location and state appear under `manualRoot` in `/status`. It is session-only and does not obtain root, patch firmware, or survive a TV reboot.
 
 The adapter's status includes `rooting.backend`, the current `rooting.phase`, and
 a nullable `rooting.failure` with the last failed stage and a fixed error code.
