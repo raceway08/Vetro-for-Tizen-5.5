@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 
 if ($Command.Length -gt 4096 -or $Command -match '[^\x20-\x7E]') {
     throw 'Command must be a single printable-ASCII line of at most 4096 characters.'
