@@ -1,6 +1,6 @@
 # TU8000: install Vetro and connect temporary root
 
-This is the temporary-development path for the owner's existing TU8000 root shell. It does **not** make Remote PC run unattended at boot and does not change firmware, boot partitions, UEP, SMACK policy, or the TV's account database.
+This is the temporary-development path for the owner's existing TU8000 root shell. This branch packages as Vetro **0.7.1 / shell revision 2** so it can be installed over the existing 0.7.0 test build. It does **not** make Remote PC run unattended at boot and does not change firmware, boot partitions, UEP, SMACK policy, or the TV's account database.
 
 ## What this branch adds
 
@@ -65,14 +65,15 @@ Keep Developer Mode **Host PC IP = 10.0.0.56** while installing from your Window
 Connect and verify your TV target:
 
 ```powershell
-& $sdb.FullName connect 10.0.0.167:26101
-& $sdb.FullName devices
+# Use your existing SDB executable/target configuration to confirm that
+# 10.0.0.167:26101 is listed as the UN50TU8000FXZA.
 ```
 
 Install the signed WGT using your configured Tizen CLI target:
 
 ```powershell
-& $tizen.FullName install -n $env:OUT -t YOUR_TV_TARGET
+$tizenCommand = Get-Command tizen -ErrorAction Stop
+& $tizenCommand.Source install -n $env:OUT -t YOUR_TV_TARGET
 ```
 
 Use the target identifier shown by your Tizen Studio device manager. Do not use `sdb install`. If Apps2Samsung is how you normally install custom WGTs, use its local-package installation path and the same TV certificate profile.
