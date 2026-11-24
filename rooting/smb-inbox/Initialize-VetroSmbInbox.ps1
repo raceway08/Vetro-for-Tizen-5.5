@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 
 if (-not (Test-Path -LiteralPath $SharePath -PathType Container)) {
     New-Item -ItemType Directory -Path $SharePath -Force | Out-Null
@@ -24,7 +24,7 @@ if ((Test-Path -LiteralPath $privateKeyPath) -and -not $Force) {
     throw "A signing key already exists at $privateKeyPath. Use -Force only to replace it; replacing it requires re-pinning public.pem on the TV."
 }
 
-$rsa = [System.Security.Cryptography.RSA]::Create(3072)
+$rsa = [System.Security.Cryptography.RSA]::Create()\n$rsa.KeySize = 3072
 try {
     [System.IO.File]::WriteAllText($privateKeyPath, $rsa.ExportPkcs8PrivateKeyPem(), $utf8NoBom)
     [System.IO.File]::WriteAllText($publicKeyPath, $rsa.ExportSubjectPublicKeyInfoPem(), $utf8NoBom)
