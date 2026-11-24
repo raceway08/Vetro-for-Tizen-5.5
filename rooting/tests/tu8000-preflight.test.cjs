@@ -10,6 +10,8 @@ const source = fs.readFileSync(scriptPath, 'utf8');
 assert.ok(source.indexOf('VETRO-REMOTEPC-PREFLIGHT/1') >= 0);
 assert.ok(source.indexOf('/usr/apps/privileged-service/bin/mount.smb.sh') >= 0);
 assert.ok(source.indexOf('/etc/profile.d/bash_prompt_custom.sh') >= 0);
+assert.ok(source.indexOf('/etc/prd_info.ini') >= 0);
+assert.ok(source.indexOf('^Version=') >= 0);
 assert.ok(source.indexOf('/proc/partitions') >= 0);
 assert.ok(source.indexOf('openssl dgst -sha256') >= 0);
 
