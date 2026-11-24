@@ -51,10 +51,10 @@ The local copies are now independent of later changes to the SMB share. The publ
 
 ## 2. Start the watcher from the existing root shell
 
-Run this once in the root shell after verifying both hashes:
+Run this once in the root shell after verifying both hashes. Invoke the script by **content**, not as `/bin/sh /path/to/runner.sh`: UEP-protected Tizen builds can reject a script loaded by path even when the caller is UID 0.
 
 ```sh
-/usr/bin/setsid /bin/sh "$STATE/runner.sh" "$INBOX" "$STATE/public.pem" "$STATE" \
+/usr/bin/setsid /bin/sh -c "$(cat "$STATE/runner.sh")" vetro-smb-inbox "$INBOX" "$STATE/public.pem" "$STATE" \
   </dev/null >"$STATE/console.log" 2>&1 &
 ```
 
@@ -71,7 +71,7 @@ Stop it by sending `TERM` to the PID in `runner.pid`:
 kill "$(cat /opt/usr/home/owner/share/vetro-smb-inbox/runner.pid)"
 ```
 
-The watcher does not survive a TV reboot. It only works while the existing root context and SMB mount are available.
+The watcher does not survive a TV reboot. It only works while the existing root context and SMB mount are available. The content-based invocation requirement also applies to any helper script the watcher launches.
 
 ## 3. Submit a signed command from Windows
 
