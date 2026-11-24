@@ -41,7 +41,8 @@ var state = {
     unsupported: false,
     rooting: { backend: 'sdb-archive', phase: 'stopped', failure: null },
     sdbTunnel: { listening: false },
-    agent: { connected: false }
+    agent: { connected: false },
+    manualRoot: null
 };
 
 function selfIdentity() {
