@@ -9,6 +9,7 @@ none of this implementation.
 - `tools/samsung-tv-root-master/`: only the C# payload sources Vetro builds from (`payloads/common`) and the upstream Unlicense, trimmed from [chris-ritsen/samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root).
 - `tests/`: isolated lifecycle, authentication, injection validation and detached-launch tests.
 - `smb-inbox/`: optional RSA-signed command inbox for a TV that already has an independent root shell; it is a manually started helper, not a root-acquisition backend.
+- `smb-inbox/tu8000-remote-pc-preflight.sh` and `smb-inbox/TU8000-BOOT-PERSISTENCE.md`: read-only TU8000 firmware/helper/carrier audit; not a persistence installer.
 - `on-boot-probe/package*.json`: signing dependency manifests. Historical prototypes
   and device material are local-only; they are not release dependencies.
 
