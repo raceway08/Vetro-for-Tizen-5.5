@@ -8,6 +8,7 @@ var fs = require('fs');
 var net = require('net');
 var crypto = require('crypto');
 
+var keepBootstrapToken = process.argv[1] === '--vetro-eval';
 var tokenPath = process.argv[2];
 var port = Number(process.argv[3]);
 var statusPath = process.argv[4];
@@ -411,7 +412,11 @@ function begin() {
     status('starting');
     var encodedSecret = fs.readFileSync(tokenPath, 'utf8').trim();
     secret = new Buffer(encodedSecret, 'base64');
-    fs.unlinkSync(tokenPath);
+    // The temporary CIFS handoff keeps the service-owned token in its private
+    // 0700 directory so the owner can retry the manual launch after a failed
+    // first connection. The server removes it after a successful AUTH and
+    // recreates it only after an authenticated agent disconnects.
+    if (!keepBootstrapToken) fs.unlinkSync(tokenPath);
     if (secret.length < 32) throw new Error('invalid authentication token');
 
     smack = fs.readFileSync('/proc/self/attr/current', 'utf8').trim();
