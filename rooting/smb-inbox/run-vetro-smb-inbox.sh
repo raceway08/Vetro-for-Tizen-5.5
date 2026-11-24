@@ -45,12 +45,21 @@ trap 'rm -f "$STATE_DIR/runner.pid"; rm -rf "$WORK"' EXIT
 trap 'exit 0' HUP INT TERM
 
 CONTEXT=$(cat /proc/self/attr/current 2>/dev/null || true)
+if [ "$CONTEXT" != "System::Privileged" ]; then
+    echo "ERROR: expected SMACK System::Privileged, got: $CONTEXT" >&2
+    exit 1
+fi
 log "START uid=$(id -u) context=$CONTEXT inbox=$INBOX"
 echo "Vetro SMB inbox ready; jobs are read from $INBOX/run.vjob"
 echo "Local logs: $STATE_DIR/jobs/"
 
 reject_job() {
-    log "REJECT id=${JOB_ID:-unknown} reason=$1"
+    FINGERPRINT=$("$OPENSSL" dgst -sha256 "$WORK/snapshot" 2>/dev/null | awk '{print $NF}')
+    REJECT_MARKER="$STATE_DIR/seen/rejected-$FINGERPRINT"
+    if [ -n "$FINGERPRINT" ] && [ ! -f "$REJECT_MARKER" ]; then
+        : > "$REJECT_MARKER"
+        log "REJECT id=${JOB_ID:-unknown} reason=$1"
+    fi
     rm -f "$WORK/snapshot" "$WORK/payload" "$WORK/signature.der" "$WORK/command.bin"
 }
 
@@ -157,6 +166,9 @@ while :; do
         printf 'VETRO_JOB_ID=%s\n' "$JOB_ID"
         printf 'START_UTC=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)"
         printf 'RUN_AS_UID=%s\n' "$(id -u)"
+        printf 'RUN_AS_GID=%s\n' "$(id -g)"
+        printf 'SMACK=%s\n' "$(cat /proc/self/attr/current 2>/dev/null)"
+        printf 'CAP_EFF=%s\n' "$(awk '/^CapEff:/ {print $2}' /proc/self/status 2>/dev/null)"
         /bin/sh -c "$COMMAND"
         RC=$?
         printf 'EXIT_CODE=%s\n' "$RC"
