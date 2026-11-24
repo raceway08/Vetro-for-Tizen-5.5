@@ -5,7 +5,7 @@ This helper is for a TV where you **already have an independent root shell**. It
 It gives you one simple drop location on the existing Windows SMB share:
 
 ```text
-\\10.0.0.56\\TVShareTest\\VetroInbox\\run.vjob
+\\10.0.0.56\TVShareTest\VetroInbox\run.vjob
 ```
 
 A small root-side watcher reads that file, verifies an RSA-SHA256 signature against a public key pinned on the TV's local storage, checks expiry and replay ID, and only then runs the signed one-line command as UID 0. The SMB mount can remain `ro,nosuid,nodev,noexec`: the watcher reads the job as data and passes the verified command to `/bin/sh -c`; it does not execute a file directly from the SMB mount.
@@ -17,15 +17,15 @@ A small root-side watcher reads that file, verifies an RSA-SHA256 signature agai
 From this folder in your Git checkout, run the setup script in PowerShell 7:
 
 ```powershell
-.\\Initialize-VetroSmbInbox.ps1
+.\Initialize-VetroSmbInbox.ps1
 ```
 
-It creates the inbox folder if needed, generates a 3072-bit RSA key pair, keeps `private.pem` under your Windows `%APPDATA%\\Vetro\\SmbInbox` directory, and copies only `public.pem` and the shell watcher to the SMB share. Do not copy `private.pem` to the share or commit it to Git.
+It creates the inbox folder if needed, generates a 3072-bit RSA key pair, keeps `private.pem` under your Windows `%APPDATA%\Vetro\SmbInbox` directory, and copies only `public.pem` and the shell watcher to the SMB share. Do not copy `private.pem` to the share or commit it to Git.
 
 To use a different share path:
 
 ```powershell
-.\\Initialize-VetroSmbInbox.ps1 -SharePath '\\\\10.0.0.56\\TVShareTest\\VetroInbox'
+.\Initialize-VetroSmbInbox.ps1 -SharePath '\\10.0.0.56\TVShareTest\VetroInbox'
 ```
 
 The TV public key must be pinned locally. In your existing TV root shell, run the three commands printed by the setup script. For the default path they are:
@@ -47,8 +47,8 @@ INBOX=/opt/usr/home/owner/content/smb/TVShareTest/VetroInbox
 STATE=/opt/usr/home/owner/share/vetro-smb-inbox
 mkdir -p "$STATE"
 SCRIPT=$(cat "$INBOX/run-vetro-smb-inbox.sh")
-/usr/bin/setsid /bin/sh -c "$SCRIPT" vetro-smb-inbox \\
-  "$INBOX" "$STATE/public.pem" "$STATE" \\
+/usr/bin/setsid /bin/sh -c "$SCRIPT" vetro-smb-inbox \
+  "$INBOX" "$STATE/public.pem" "$STATE" \
   </dev/null >"$STATE/console.log" 2>&1 &
 ```
 
@@ -72,7 +72,7 @@ The watcher does not survive a TV reboot. It only works while the existing root 
 Use PowerShell 7 and the private key created during setup:
 
 ```powershell
-.\\New-VetroSmbCommand.ps1 -Command 'id; cat /proc/self/attr/current'
+.\New-VetroSmbCommand.ps1 -Command 'id; cat /proc/self/attr/current'
 ```
 
 The script writes a single `run.vjob` file atomically. It defaults to a 10-minute expiry; the allowed setting is 1–60 minutes. The watcher accepts a job once, records its random ID on local TV storage, and writes output to:
@@ -86,7 +86,7 @@ Use the job ID printed by PowerShell to inspect the matching log from the root s
 Example invoking Samsung's signed .NET host:
 
 ```powershell
-.\\New-VetroSmbCommand.ps1 -Command '/usr/bin/dotnet-launcher --standalone /opt/usr/home/owner/content/smb/TVShareTest/VetroInbox/MyTool.dll'
+.\New-VetroSmbCommand.ps1 -Command '/usr/bin/dotnet-launcher --standalone /opt/usr/home/owner/content/smb/TVShareTest/VetroInbox/MyTool.dll'
 ```
 
 Place `MyTool.dll` and its matching `.runtimeconfig.json`, `.deps.json`, and dependency files in the inbox first. The job command is RSA-signed; the DLL contents are not automatically hashed by this helper.
