@@ -28,27 +28,33 @@ To use a different share path:
 .\Initialize-VetroSmbInbox.ps1 -SharePath '\\10.0.0.56\TVShareTest\VetroInbox'
 ```
 
-The TV public key must be pinned locally. In your existing TV root shell, run the three commands printed by the setup script. For the default path they are:
-
-```sh
-mkdir -p /opt/usr/home/owner/share/vetro-smb-inbox
-cp /opt/usr/home/owner/content/smb/TVShareTest/VetroInbox/public.pem /opt/usr/home/owner/share/vetro-smb-inbox/public.pem
-chmod 600 /opt/usr/home/owner/share/vetro-smb-inbox/public.pem
-```
-
-The public key is copied off the SMB mount so a person who can write to the share cannot replace the TV's trusted key.
-
-## 2. Start the watcher from the existing root shell
-
-Run this once in the root shell. It reads the watcher source from the `noexec` SMB mount and passes that source to the system shell; it does not execute the SMB file directly.
+The TV public key and watcher must be copied to local storage and fingerprint-checked **before running anything as root**. The setup script prints the expected SHA-256 hashes for both files. In your existing TV root shell:
 
 ```sh
 INBOX=/opt/usr/home/owner/content/smb/TVShareTest/VetroInbox
 STATE=/opt/usr/home/owner/share/vetro-smb-inbox
 mkdir -p "$STATE"
-SCRIPT=$(cat "$INBOX/run-vetro-smb-inbox.sh")
-/usr/bin/setsid /bin/sh -c "$SCRIPT" vetro-smb-inbox \
-  "$INBOX" "$STATE/public.pem" "$STATE" \
+chmod 700 "$STATE"
+cp "$INBOX/public.pem" "$STATE/public.pem"
+cp "$INBOX/run-vetro-smb-inbox.sh" "$STATE/runner.sh"
+openssl dgst -sha256 "$STATE/public.pem"
+openssl dgst -sha256 "$STATE/runner.sh"
+```
+
+Compare the two hash values printed by OpenSSL with the **Public key SHA-256** and **Runner SHA-256** values printed by `Initialize-VetroSmbInbox.ps1` on Windows. Do not continue unless both match exactly. Then:
+
+```sh
+chmod 600 "$STATE/public.pem" "$STATE/runner.sh"
+```
+
+The local copies are now independent of later changes to the SMB share. The public key is pinned off the share, and the watcher code is run from the TV's local storage, not directly from the share.
+
+## 2. Start the watcher from the existing root shell
+
+Run this once in the root shell after verifying both hashes:
+
+```sh
+/usr/bin/setsid /bin/sh "$STATE/runner.sh" "$INBOX" "$STATE/public.pem" "$STATE" \
   </dev/null >"$STATE/console.log" 2>&1 &
 ```
 
