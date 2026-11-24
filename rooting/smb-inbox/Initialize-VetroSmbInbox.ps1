@@ -45,6 +45,8 @@ Write-Host 'Vetro SMB inbox initialized.' -ForegroundColor Green
 Write-Host "Private signing key (keep on this PC): $privateKeyPath"
 Write-Host "Public verification key (copied to SMB): $publicKeyPath"
 Write-Host "Inbox share: $SharePath"
+Write-Host ("Public key SHA-256: " + (Get-FileHash -LiteralPath $publicKeyPath -Algorithm SHA256).Hash.ToLowerInvariant())
+Write-Host ("Runner SHA-256: " + (Get-FileHash -LiteralPath $runnerTarget -Algorithm SHA256).Hash.ToLowerInvariant())
 Write-Host ''
 Write-Host 'Run this once in the existing TV root shell to pin the public key locally:'
 Write-Host 'mkdir -p /opt/usr/home/owner/share/vetro-smb-inbox'
