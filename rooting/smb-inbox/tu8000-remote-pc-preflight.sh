@@ -60,6 +60,13 @@ for f in /etc/info.ini /etc/tizen-release /etc/version /etc/sw-version /etc/rele
     esac
 done
 
+section "SAMSUNG FIRMWARE BUILD"
+if [ -r /etc/prd_info.ini ]; then
+    sed -n '/^\[Version\]/,/^\[/p' /etc/prd_info.ini 2>/dev/null | grep -E '^Version=' | head -n 1
+else
+    printf '/etc/prd_info.ini unavailable\n'
+fi
+
 section "TIZEN RUNTIME"
 uname -r 2>/dev/null || true
 if [ -x /usr/bin/node ]; then
