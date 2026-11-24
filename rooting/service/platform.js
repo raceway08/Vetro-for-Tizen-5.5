@@ -120,6 +120,7 @@ function createManualRootBootstrap(agentPort) {
     var script = [
         '#!/bin/sh',
         'set -eu',
+        'umask 077',
         'BASE=' + shellQuote(dir),
         'PORT=' + Number(agentPort),
         'if [ "$(id -u 2>/dev/null)" != "0" ]; then echo "ERROR: open the existing root shell first" >&2; exit 71; fi',
@@ -133,16 +134,20 @@ function createManualRootBootstrap(agentPort) {
         'if [ ! -s "$BASE/root-agent.token" ]; then echo "ERROR: temporary token is unavailable; restart Vetro and read /status again" >&2; exit 75; fi',
         'RUN_ID=$(/bin/cat /proc/sys/kernel/random/uuid 2>/dev/null || date +%s)',
         'WORKDIR="$BASE/work-$RUN_ID"',
+        '/bin/mkdir -m 700 "$WORKDIR"',
+        '/usr/bin/mkfifo "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr"',
+        '/bin/chmod 600 "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr"',
+        'NODE_SOURCE=$(/bin/cat "$BASE/root-agent.js")',
+        'WORKER_SOURCE=$(/bin/cat "$BASE/worker.sh")',
         '/usr/bin/setsid /bin/sh -c "$WORKER_SOURCE" vetro-worker "$WORKDIR" </dev/null >"$BASE/worker-$RUN_ID.log" 2>&1 &',
+        'WORKER_PID=$!',
         '/usr/bin/setsid /usr/bin/node -e "$NODE_SOURCE" -- --vetro-eval "$BASE/root-agent.token" "$PORT" "$BASE/status-$RUN_ID" "$BASE/agent-$RUN_ID.log" "$WORKDIR" </dev/null >"$BASE/node-$RUN_ID.console" 2>&1 &',
-        'echo "agent log: $BASE/agent-$RUN_ID.log"',
-        'echo "worker log: $BASE/worker-$RUN_ID.log"',
-
+        'NODE_PID=$!',
         'echo "Vetro temporary root agent launched"',
         'echo "worker pid: $WORKER_PID"',
         'echo "agent pid: $NODE_PID"',
-        'echo "agent log: $BASE/agent-$.log"',
-        'echo "worker log: $BASE/worker-$.log"',
+        'echo "agent log: $BASE/agent-$RUN_ID.log"',
+        'echo "worker log: $BASE/worker-$RUN_ID.log"',
         'echo "Check Vetro /status for agent.connected=true and UID 0."'
     ].join('\n') + '\n';
 
