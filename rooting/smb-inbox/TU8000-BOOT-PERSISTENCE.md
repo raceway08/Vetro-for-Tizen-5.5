@@ -29,7 +29,7 @@ P=/opt/usr/home/owner/content/smb/TVShareTest/VetroInbox/tu8000-remote-pc-prefli
 
 The script prints:
 - current shell UID/GID, effective capabilities and SMACK label;
-- only model/firmware-related keys from common system information files;
+- the exact firmware build from the `[Version]` section of `/etc/prd_info.ini`, plus model/Tizen data from the system information files;
 - the Node and OpenSSL versions;
 - size, owner/mode and SHA-256 of `mount.smb.sh`;
 - size, owner/mode and SHA-256 of `/etc/profile.d/bash_prompt_custom.sh`;
@@ -43,7 +43,7 @@ Send back the complete output. The model/firmware identity and both hashes are t
 
 After Test 1, the next checks are:
 
-1. Confirm the exact model code and firmware build. "Tizen 5.5" alone is not a firmware match.
+1. Confirm the exact commercial model and `T-...` firmware build. The TV's `/etc/info.ini` can show only the generic `Tizen5/TV` product class; `/etc/prd_info.ini` is the firmware-version source used by Vetro's own diagnostic reader. "Tizen 5.5" alone is not a firmware match.
 2. Compare the privileged helper and profile carrier with the known Tizen 5.5 reports. A matching helper hash alone does not prove the whole Remote PC input path works.
 3. Obtain and verify the official firmware image for the exact model/region/build, then locate the carrier and root filesystem geometry offline. Do not reuse an offset from a TU7000, TU8500, Q60T, or Q74T.
 4. Build and test the supervisor and authenticated job channel offline first, including symlink rejection, exact service-UID ownership, atomic claiming, per-boot locking, bounded output, and restart handling.
