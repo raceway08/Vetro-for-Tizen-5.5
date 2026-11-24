@@ -39,7 +39,7 @@ awk '/^(Uid|Gid|CapEff):/ {print}' /proc/self/status 2>/dev/null || true
 section "TV MODEL AND FIRMWARE KEYS"
 for f in /etc/info.ini /etc/tizen-release /etc/version /etc/sw-version /etc/release; do
     [ -r "$f" ] || continue
-    printf -- '-- %s --\n' "$f"
+    printf '%s\n' "-- $f --"
     case "$f" in
         */info.ini)
             awk -F '=' '
