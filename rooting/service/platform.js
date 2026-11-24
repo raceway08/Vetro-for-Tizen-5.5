@@ -88,6 +88,98 @@ function shellQuote(value) {
     return "'" + String(value).replace(/'/g, "'\\''") + "'";
 }
 
+
+var manualRootRuntime = null;
+
+// Temporary Remote PC/CIFS handoff for the Tizen 5.5 Node 4.4.3 build.
+// Vetro remains UID 5001. The owner starts this one-shot handoff from an
+// already-authenticated System::Privileged shell; no firmware is modified.
+function createManualRootBootstrap(agentPort) {
+    if (process.version !== 'v4.4.3') return null;
+
+    var dir = ensureDir(STAGE + '/' + pkg + '/manual-root');
+    fs.chmodSync(dir, 448 /* 0700 */);
+
+    var agentSource = fs.readFileSync(path.join(__dirname, 'root-agent-node.js'));
+    var workerSource = new Buffer(rootAgentWorker, 'utf8');
+    var agentPath = path.join(dir, 'root-agent.js');
+    var workerPath = path.join(dir, 'worker.sh');
+    var tokenPath = path.join(dir, 'root-agent.token');
+    var startPath = path.join(dir, 'start.sh');
+
+    fs.writeFileSync(agentPath, agentSource, {mode: 384 /* 0600 */});
+    fs.writeFileSync(workerPath, workerSource, {mode: 384 /* 0600 */});
+    fs.writeFileSync(tokenPath, secretB64 + '\n', {mode: 384 /* 0600 */});
+    fs.chmodSync(agentPath, 384);
+    fs.chmodSync(workerPath, 384);
+    fs.chmodSync(tokenPath, 384);
+
+    var agentHash = crypto.createHash('sha256').update(agentSource).digest('hex');
+    var workerHash = crypto.createHash('sha256').update(workerSource).digest('hex');
+    var script = [
+        '#!/bin/sh',
+        'set -eu',
+        'BASE=' + shellQuote(dir),
+        'PORT=' + Number(agentPort),
+        'if [ "$(id -u 2>/dev/null)" != "0" ]; then echo "ERROR: open the existing root shell first" >&2; exit 71; fi',
+        'CONTEXT=$(/bin/cat /proc/self/attr/current 2>/dev/null || true)',
+        'if [ "$CONTEXT" != "System::Privileged" ]; then echo "ERROR: expected System::Privileged, got: $CONTEXT" >&2; exit 72; fi',
+        'OPENSSL=$(command -v openssl 2>/dev/null || true)',
+        'if [ -z "$OPENSSL" ]; then echo "ERROR: openssl is required" >&2; exit 73; fi',
+        'check_hash() { actual=$("$OPENSSL" dgst -sha256 "$1" 2>/dev/null | awk \'{print $NF}\'); [ "$actual" = "$2" ] || { echo "ERROR: SHA-256 mismatch: $1" >&2; exit 74; }; }',
+        'check_hash "$BASE/root-agent.js" ' + agentHash,
+        'check_hash "$BASE/worker.sh" ' + workerHash,
+        'if [ ! -s "$BASE/root-agent.token" ]; then echo "ERROR: temporary token is unavailable; restart Vetro and read /status again" >&2; exit 75; fi',
+        'WORKDIR="$BASE/work-$"',
+        '/bin/mkdir -m 700 "$WORKDIR"',
+        '/usr/bin/mkfifo "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr"',
+        '/bin/chmod 600 "$WORKDIR/commands" "$WORKDIR/results" "$WORKDIR/stdout" "$WORKDIR/stderr"',
+        'NODE_SOURCE=$(/bin/cat "$BASE/root-agent.js")',
+        'WORKER_SOURCE=$(/bin/cat "$BASE/worker.sh")',
+        '/usr/bin/setsid /bin/sh -c "$WORKER_SOURCE" vetro-worker "$WORKDIR" </dev/null >"$BASE/worker-$.log" 2>&1 &',
+        'WORKER_PID=$!',
+        '/usr/bin/setsid /usr/bin/node -e "$NODE_SOURCE" -- --vetro-eval "$BASE/root-agent.token" "$PORT" "$BASE/status-$" "$BASE/agent-$.log" "$WORKDIR" </dev/null >"$BASE/node-$.console" 2>&1 &',
+        'NODE_PID=$!',
+        'echo "Vetro temporary root agent launched"',
+        'echo "worker pid: $WORKER_PID"',
+        'echo "agent pid: $NODE_PID"',
+        'echo "agent log: $BASE/agent-$.log"',
+        'echo "worker log: $BASE/worker-$.log"',
+        'echo "Check Vetro /status for agent.connected=true and UID 0."'
+    ].join('\n') + '\n';
+
+    fs.writeFileSync(startPath, script, {mode: 448 /* 0700 */});
+    fs.chmodSync(startPath, 448);
+    manualRootRuntime = {dir: dir, tokenPath: tokenPath, startPath: startPath, port: agentPort};
+    state.manualRoot = {
+        available: true,
+        state: 'ready-to-launch',
+        bootstrapPath: startPath,
+        port: agentPort,
+        method: 'existing-remote-pc-cifs-root-shell',
+        note: 'Temporary only; start from the existing System::Privileged root shell'
+    };
+    return manualRootRuntime;
+}
+
+function refreshManualRootToken() {
+    if (!manualRootRuntime || !state.running) return;
+    try {
+        fs.writeFileSync(manualRootRuntime.tokenPath, secretB64 + '\n', {mode: 384 /* 0600 */});
+        fs.chmodSync(manualRootRuntime.tokenPath, 384);
+        state.manualRoot.state = 'ready-to-launch';
+    } catch (e) {
+        state.manualRoot.state = 'bootstrap-unavailable';
+        state.manualRoot.error = 'token-refresh-failed';
+    }
+}
+
+function consumeManualRootToken() {
+    if (!manualRootRuntime) return;
+    try { fs.unlinkSync(manualRootRuntime.tokenPath); } catch (e) {}
+    if (state.manualRoot) state.manualRoot.state = 'connected';
+}
+
 function buildLaunchScript(agentPort, hostCommand, useNodeFifo) {
     var staging = STAGE + '/' + pkg;
     if (!useNodeFifo) {
@@ -368,6 +460,7 @@ function startAgent() {
         secret: secret,
         onConnect: function (conn) {
             if (!state.running) { conn._socket.destroy(); return; }
+            consumeManualRootToken();
             if (relaunchTimer) { clearTimeout(relaunchTimer); relaunchTimer = null; }
             agentConnected = true;
             // A connected agent ends any launch still in flight (it would otherwise keep `launching` set and
@@ -398,6 +491,7 @@ function startAgent() {
         onClose: function () {
             if (!state.running) return;
             var connectedFor = state.agent && state.agent.at ? Date.now() - state.agent.at : 0;
+            refreshManualRootToken();
             agentConnected = false;
             state.agent = { connected: false };
             timing.losses++;
@@ -419,6 +513,10 @@ function startAgent() {
             if (!state.running) return;
             if (!startHr) startHr = process.hrtime();
             state.agentPort = port;
+            try { createManualRootBootstrap(port); }
+            catch (bootstrapError) {
+                state.manualRoot = {available: false, state: 'preparation-failed', error: 'bootstrap-preparation-failed'};
+            }
             relaunch();
         });
     });
@@ -593,6 +691,9 @@ function stop() {
     launchClient = null;
     if (agentServer) agentServer.close();
     agentServer = null;
+    if (manualRootRuntime) { try { fs.unlinkSync(manualRootRuntime.tokenPath); } catch (e) {} }
+    manualRootRuntime = null;
+    state.manualRoot = null;
     agentConnected = false;
     if (tunnelRetryTimer) clearTimeout(tunnelRetryTimer);
     tunnelRetryTimer = null;
